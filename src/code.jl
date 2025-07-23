@@ -1,19 +1,19 @@
 using CSV, DataFrames, Random, Images, FileIO, Flux, Statistics, ProgressMeter, MLUtils
 
-# Set random seed for reproducibility
+# Random seed for reproducibility
 Random.seed!(42)
 
 # Load and filter the dataset
 styles = CSV.read("Fashion_mnist/styles.csv", DataFrame)
 
-# Keep only our selected subcategories
+# Keep selected subcategories
 selected_subcats = ["Topwear", "Bottomwear", "Innerwear", 
                    "Shoes", "Sandal", "Flip Flops",
                    "Bags", "Socks", "Scarves"]
 
 filtered = styles[styles.subCategory .∈ [selected_subcats], :]
 
-# Create our sampled dataset with exact counts
+# Create sampled dataset with exact counts
 subcat_counts = Dict(
     "Topwear" => 230,
     "Bottomwear" => 40,
@@ -56,14 +56,11 @@ sort!(final_counts, :count, rev=true)
 println("Final distribution:")
 println(final_counts)
 
-## --------------------------
-## 2. IMAGE LOADING & PREPROCESSING (FIXED)
-## --------------------------
-
+# 2. IMAGE LOADING & PREPROCESSING (FIXED)
 function load_images(df, image_dir)
     # Initialize arrays with proper dimensions
     num_images = nrow(df)
-    X = Array{Float32}(undef, 64, 64, 3, num_images)  # Note: Height × Width × Channels × Batch
+    X = Array{Float32}(undef, 64, 64, 3, num_images) 
     y = Int[]
     
     # Create label mapping
@@ -82,15 +79,15 @@ function load_images(df, image_dir)
                 X[:,:,1,i] .= Float32.(img) ./ 255f0
                 X[:,:,2,i] .= Float32.(img) ./ 255f0
                 X[:,:,3,i] .= Float32.(img) ./ 255f0
-            else  # Color
+            else  
                 X[:,:,:,i] .= permutedims(Float32.(channelview(img)), (2,3,1)) ./ 255f0
             end
             
             push!(y, label_dict[row.subCategory])
         catch e
             @error "Failed to process $(row.id): $e"
-            X[:,:,:,i] .= 0f0  # Fill with zeros if image fails
-            push!(y, 1)  # Default to first category
+            X[:,:,:,i] .= 0f0  
+            push!(y, 1) 
         end
     end
     
@@ -102,14 +99,14 @@ function load_images(df, image_dir)
 end
 
 # Load and preprocess images
-image_dir = "Fashion_mnist/images"  # UPDATE THIS PATH
+image_dir = "Fashion_mnist/images" 
 (data, labels), label_dict = load_images(sampled, image_dir)
 
 # Verify dimensions
-println("\nData dimensions: ", size(data))  # Should be (3, 64, 64, 400)
-println("Label dimensions: ", size(labels)) # Should be (9, 400)
+println("\nData dimensions: ", size(data)) 
+println("Label dimensions: ", size(labels))
 
-# 2. YOUR EXACT MCNN9 ARCHITECTURE (UNCHANGED)
+# 3. MCNN9 ARCHITECTURE (UNCHANGED)
 function MCNN9(num_classes=9)
     Chain(
         Conv((3, 3), 3=>256, pad=(1, 1), relu),
@@ -131,11 +128,11 @@ function MCNN9(num_classes=9)
     )
 end
 
-# 3. FIXED TRAINING LOOP WITH 10-FOLD CV (DEBUG LINES ONLY)
+# 4. FIXED TRAINING LOOP WITH 10-FOLD CV
 function run_10fold_cv()
     X, y = load_and_preprocess_data()
     println("Shape of X before permutedims: ", size(X))
-    #X = permutedims(X, (2, 3, 1, 4))  # KEEP THIS ORDER (3, 2, 1, 4)
+    #X = permutedims(X, (2, 3, 1, 4))  
     println("Shape of X after permutedims: ", size(X))
 
     k = 10
@@ -147,22 +144,22 @@ function run_10fold_cv()
     for fold in 1:k
         println("\n--- Fold $fold ---")
 
-        val_idx = indices[(fold-1)*fold_size+1 : fold*fold_size]
+        test_idx = indices[(fold-1)*fold_size+1 : fold*fold_size]
         train_idx = setdiff(indices, val_idx)
 
         X_train, y_train = X[:, :, :, train_idx], y[:, train_idx]
-        X_val,   y_val   = X[:, :, :, val_idx],   y[:, val_idx]
+        X_test,   y_test   = X[:, :, :, test_idx],   y[:, test_idx]
 
         println("X_train shape: ", size(X_train))
         println("y_train shape: ", size(y_train))
-        println("X_val shape: ", size(X_val))
-        println("y_val shape: ", size(y_val))
+        println("X_test shape: ", size(X_test))
+        println("y_test shape: ", size(y_test))
 
         model = MCNN9(size(y, 1))
         opt = Flux.setup(Flux.Adam(0.001), model)
 
         # Train
-        for epoch in 1:5  # Adjustable
+        for epoch in 1:5
             loader = Flux.DataLoader((X_train, y_train), batchsize=32, shuffle=true)
             for (x, y) in loader
                 println("Batch X: ", size(x))
@@ -175,8 +172,8 @@ function run_10fold_cv()
         end
 
         # Validate
-        preds = model(X_val)
-        acc = mean(Flux.onecold(preds) .== Flux.onecold(y_val))
+        preds = model(X_test)
+        acc = mean(Flux.onecold(preds) .== Flux.onecold(y_test))
         println("Accuracy: $(round(acc * 100, digits=2))%")
         push!(accuracies, acc)
     end
@@ -216,4 +213,3 @@ plot(1:10, accuracies .* 100,
      title = "10-Fold Cross Validation Accuracy",
      lw = 2,
      marker = :circle)
-
