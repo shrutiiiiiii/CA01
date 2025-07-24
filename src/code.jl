@@ -130,7 +130,7 @@ end
 
 # 4. FIXED TRAINING LOOP WITH 10-FOLD CV
 function run_10fold_cv()
-    X, y = load_and_preprocess_data()
+    X, y = load_images()
     println("Shape of X before permutedims: ", size(X))
     #X = permutedims(X, (2, 3, 1, 4))  
     println("Shape of X after permutedims: ", size(X))
@@ -145,7 +145,7 @@ function run_10fold_cv()
         println("\n--- Fold $fold ---")
 
         test_idx = indices[(fold-1)*fold_size+1 : fold*fold_size]
-        train_idx = setdiff(indices, val_idx)
+        train_idx = setdiff(indices, test_idx)
 
         X_train, y_train = X[:, :, :, train_idx], y[:, train_idx]
         X_test,   y_test   = X[:, :, :, test_idx],   y[:, test_idx]
